@@ -5,38 +5,50 @@ import path from 'path';
 
 // Custom plugin to dynamically generate a list of files in the public directory
 function publicFilesPlugin() {
+  const publicDir = path.resolve(__dirname, 'public');
+
+  const getAllFiles = (dirPath, arrayOfFiles = []) => {
+    if (!fs.existsSync(dirPath)) return arrayOfFiles;
+    
+    const files = fs.readdirSync(dirPath);
+    files.forEach((file) => {
+      const absolutePath = path.join(dirPath, file);
+      if (fs.statSync(absolutePath).isDirectory()) {
+         arrayOfFiles = getAllFiles(absolutePath, arrayOfFiles);
+      } else {
+         // Exclude the manifest file itself
+         if (file !== 'files.json') {
+            const relativePath = absolutePath.replace(publicDir, '').replace(/\\/g, '/');
+            arrayOfFiles.push(relativePath);
+         }
+      }
+    });
+    
+    return arrayOfFiles;
+  };
+
   return {
     name: 'public-files-manifest',
+    // 1. Used during "npm run build" for generating static Vercel output
     buildStart() {
-      const publicDir = path.resolve(__dirname, 'public');
-      
-      // Safety check in case public doesn't exist
       if (!fs.existsSync(publicDir)) {
         fs.mkdirSync(publicDir);
       }
-      
-      const getAllFiles = (dirPath, arrayOfFiles = []) => {
-        const files = fs.readdirSync(dirPath);
-        
-        files.forEach((file) => {
-          const absolutePath = path.join(dirPath, file);
-          if (fs.statSync(absolutePath).isDirectory()) {
-            arrayOfFiles = getAllFiles(absolutePath, arrayOfFiles);
-          } else {
-            // Exclude the manifest file itself from the list
-            if (file !== 'files.json') {
-               // Convert path to use forward slashes for URLs
-               const relativePath = absolutePath.replace(publicDir, '').replace(/\\/g, '/');
-               arrayOfFiles.push(relativePath);
-            }
-          }
-        });
-        
-        return arrayOfFiles;
-      };
-      
       const files = getAllFiles(publicDir);
       fs.writeFileSync(path.join(publicDir, 'files.json'), JSON.stringify(files, null, 2));
+    },
+    // 2. Used during "npm run dev" to ALWAYS re-calculate on browser refresh
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        // Intercept requests to files.json from the React app
+        if (req.url === '/files.json') {
+          const files = getAllFiles(publicDir);
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(files, null, 2));
+        } else {
+          next();
+        }
+      });
     }
   };
 }

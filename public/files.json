@@ -1,8 +1,4 @@
 [
-  "/MongoDB.zip",
-  "/MySQL.zip",
-  "/config.json",
-  "/documents/report.pdf",
-  "/images/logo.png",
-  "/vite.svg"
+  "/files/MongoDB.zip",
+  "/files/MySQL.zip"
 ]

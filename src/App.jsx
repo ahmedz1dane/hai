@@ -1,22 +1,26 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import './App.css';
-
-// Dynamically discover all files inside the public folder structure at build time
-const publicFiles = import.meta.glob('../public/**/*');
 
 function App() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState('');
   
-  // Extract clean file paths
-  const allFiles = useMemo(() => {
-    return Object.keys(publicFiles).map(key => key.replace('../public', ''));
-  }, []);
-
+  // State for all available files
+  const [allFiles, setAllFiles] = useState([]);
   // State to keep track of selected files
   const [selectedFiles, setSelectedFiles] = useState(new Set());
+
+  // Dynamically load the files list from our manifest
+  useEffect(() => {
+    fetch('/files.json')
+      .then(res => res.json())
+      .then(data => setAllFiles(data))
+      .catch(err => {
+        console.error('Failed to fetch the file manifest:', err);
+      });
+  }, []);
 
   const toggleSelection = (path) => {
     const newSelected = new Set(selectedFiles);
@@ -67,7 +71,7 @@ function App() {
       setProgress('Compressing into ZIP...');
       const content = await zip.generateAsync({ type: 'blob' });
       
-      saveAs(content, 'selected-files.zip');
+      saveAs(content, 'dynamic-package.zip');
       setProgress('Download complete!');
       
       setTimeout(() => setProgress(''), 3000);
@@ -129,7 +133,7 @@ function App() {
             </div>
           ))}
           {allFiles.length === 0 && (
-            <div className="empty-state">No files found in the public folder.</div>
+            <div className="empty-state">No files found.</div>
           )}
         </div>
         
